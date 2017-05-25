@@ -82,6 +82,7 @@ r2[:,:,:] = X[:,:,:]**2+Y[:,:,:]**2+Z[:,:,:]**2
 del X,Y,Z
 
 r2rt = np.sqrt(r2)
+del r2
 
 minrt = r2rt.min()
 maxrt = r2rt.max()
@@ -103,71 +104,60 @@ ner = int((maxrt-minrt)/isotropic1024coarse['dx'])
 
 rbins = np.linspace(minrt,maxrt,ner+1)
 
-cacheEnstrophyData = False
-loadEnstrophyFromCache = True
+folder = '/home/jhelsas/scratch/slab64'
 
-folder = "/home/jhelsas/scratch/slab64"
+##############################################################################
 
-filename = "ref-enstrophy-"+str(rank)+".npz"
+filename = 'ref-Q-'+str(rank)+'.npz'
 file = folder + "/" + filename
 
-if(loadEnstrophyFromCache):
-    comm.Barrier(); t1=MPI.Wtime()
-    content = np.load(file)
+comm.Barrier(); t1=MPI.Wtime()
+content = np.load(file)
     
-    w2 = ft.zeros_aligned(FFT.real_shape(), dtype=FFT.float)
+Q = np.zeros(FFT.real_shape(), dtype=FFT.float)
     
-    w2[:,:,:] = content['w2'].astype(FFT.float)
+Q[:,:,:] = content['Q'].astype(FFT.float)
     
-    comm.Barrier(); t2=MPI.Wtime()
-    if(rank==0):
-        print("Finished loading")
-        sys.stdout.write('Load from disk: {0:.2f} seconds\n'.format(t2-t1))
+comm.Barrier(); t2=MPI.Wtime()
+if(rank==0):
+    print("Finished loading")
+    sys.stdout.write('Load from disk: {0:.2f} seconds\n'.format(t2-t1))
 
-if(cacheEnstrophyData):
-    
-    comm.Barrier(); t1=MPI.Wtime()
-    np.savez(file,w2=w2,nproc=nproc)
-    comm.Barrier(); t2=MPI.Wtime()
-    if(rank==0):
-        sys.stdout.write('Caching the data: {0:.2f} seconds\n'.format(t2-t1))
+################################################################################
 
-cacheStrainrateData = False
-loadStrainrateFromCache = True
-
-filename = "ref-strainrate-"+str(rank)+".npz"
+filename = 'ref-R-'+str(rank)+'.npz'
 file = folder + "/" + filename
 
-if(loadStrainrateFromCache):
-    comm.Barrier(); t1=MPI.Wtime()
-    content = np.load(file)
+comm.Barrier(); t1=MPI.Wtime()
+content = np.load(file)
     
-    S2 = ft.zeros_aligned(FFT.real_shape(), dtype=FFT.float)
+R = np.zeros(FFT.real_shape(), dtype=FFT.float)
     
-    S2[:,:,:] = content['S2'].astype(FFT.float)
+R[:,:,:] = content['R'].astype(FFT.float)
     
-    comm.Barrier(); t2=MPI.Wtime()
-    if(rank==0):
-        print("Finished loading")
-        sys.stdout.write('Load from disk: {0:.2f} seconds\n'.format(t2-t1))
+comm.Barrier(); t2=MPI.Wtime()
+if(rank==0):
+    print("Finished loading")
+    sys.stdout.write('Load from disk: {0:.2f} seconds\n'.format(t2-t1))
 
-if(cacheEnstrophyData):
+################################################################################
+
+filename = 'ref-strainrate-'+str(rank)+'.npz'
+file = folder + "/" + filename
+
+comm.Barrier(); t1=MPI.Wtime()
+content = np.load(file)
     
-    comm.Barrier(); t1=MPI.Wtime()
-    np.savez(file,S2=S2,nproc=nproc)
-    comm.Barrier(); t2=MPI.Wtime()
-    if(rank==0):
-        sys.stdout.write('Caching the data: {0:.2f} seconds\n'.format(t2-t1))
+S2 = np.zeros(FFT.real_shape(), dtype=FFT.float)
+    
+S2[:,:,:] = content['S2'].astype(FFT.float)
+    
+comm.Barrier(); t2=MPI.Wtime()
+if(rank==0):
+    print("Finished loading")
+    sys.stdout.write('Load from disk: {0:.2f} seconds\n'.format(t2-t1))
 
-w2[:,:,:] = 0.5*w2[:,:,:]
-
-avgO = np.average(w2)
-avgOGl=np.zeros(1,dtype=FFT.float)
-
-comm.Allreduce([avgO,MPI.DOUBLE],[avgOGl,MPI.DOUBLE],op=MPI.SUM)
-avgO = avgOGl[0]/nproc
-
-########
+###################################
 
 avgE = np.average(S2)
 avgEGl=np.zeros(1,dtype=FFT.float)
@@ -175,30 +165,14 @@ avgEGl=np.zeros(1,dtype=FFT.float)
 comm.Allreduce([avgE,MPI.DOUBLE],[avgEGl,MPI.DOUBLE],op=MPI.SUM)
 avgE = avgEGl[0]/nproc
 
-########
+##################################
 
 if rank == 0:
-    print(avgO,avgE,(avgE-avgO)/avgO)
+    print(avgE)
     
 avg = avgE
 
-##########################
-
-minw2 = w2.min()
-maxw2 = w2.max()
-
-minwGl=np.zeros(nproc,dtype=FFT.float)
-maxwGl=np.zeros(nproc,dtype=FFT.float)
-
-comm.Allgather([minw2,MPI.DOUBLE],[minwGl,MPI.DOUBLE])
-comm.Allgather([maxw2,MPI.DOUBLE],[maxwGl,MPI.DOUBLE])
-
-minO = minwGl.min()
-maxO = maxwGl.max()
-
-comm.Barrier()
-
-##########################
+##################################
 
 minS2 = S2.min()
 maxS2 = S2.max()
@@ -212,90 +186,64 @@ comm.Allgather([maxS2,MPI.DOUBLE],[maxS2Gl,MPI.DOUBLE])
 minE = minS2Gl.min()
 maxE = maxS2Gl.max()
 
-comm.Barrier()
-
-minJ = min(minO,minE)
-maxJ = max(maxO,maxE)
-
-if rank == 0:
-    print("Separate : ",minO/avg,maxO/avg,minE/avg,maxE/avg)
-    print("Joint : ",minJ/avg,maxJ/avg)
+##################################
 
 comm.Barrier()
-
-if rank==0:
-    print("<w^2>/2 : "+str(avgO))
-    print("min w2/2<S^2> : "+str(minw2/avg))
-    print("min w2/2<S^2> : "+str(maxw2/avg))
-    print("<S^2> : "+str(avgE))
-    print("min S2/<S^2> : "+str(minS2/avg))
-    print("min S2/<S^2> : "+str(maxS2/avg))
-    print("log_10: ",np.log(minJ/avg)/np.log(10),np.log(maxJ/avg)/np.log(10))
     
-lcorr = []
-llogr = []
-volFr = []
+R = R/avg
+Q = Q/(avg**(1.5))
+    
+##################################
+
+minQ = Q.min()
+maxQ = Q.max()
+
+minQGl=np.zeros(nproc,dtype=FFT.float)
+maxQGl=np.zeros(nproc,dtype=FFT.float)
+
+comm.Allgather([minQ,MPI.DOUBLE],[minQGl,MPI.DOUBLE])
+comm.Allgather([maxQ,MPI.DOUBLE],[maxQGl,MPI.DOUBLE])
+
+minQ = minQGl.min()
+maxQ = maxQGl.max()
+
+##################################
+
+minR = R.min()
+maxR = R.max()
+
+minRGl=np.zeros(nproc,dtype=FFT.float)
+maxRGl=np.zeros(nproc,dtype=FFT.float)
+
+comm.Allgather([minR,MPI.DOUBLE],[minRGl,MPI.DOUBLE])
+comm.Allgather([maxR,MPI.DOUBLE],[maxRGl,MPI.DOUBLE])
+
+minR = minRGl.min()
+maxR = maxRGl.max()
+
+comm.Barrier()
+
+##################################
+    
+del avgE,S2
 
 comm.Barrier(); t1=MPI.Wtime()
 
-######################################
-#
-#dt = 0.118441158993
-#t = avg
-#        
-#tOm = t
-#tOM = t*(1+dt)
-#        
-#tEm = t
-#tEM = t*(1+dt)
-#        
-#Index = (w2>tOm)&(w2<tOM)&(S2>tEm)&(S2<tEM)
-#        
-#chi[:,:,:] = 0
-#chi[Index] = 1
-#
-#vf = np.average(chi)
-#vgl = np.zeros(1,dtype=FFT.float)
-#comm.Allreduce([vf,MPI.DOUBLE],[vgl,MPI.DOUBLE],op=MPI.SUM)
-#vf = vgl 
-#
-#volFr.append(vf)
-#if vf<=0.:
-#    corrSum = np.zeros(rbins.shape)
-#    r2Loc = np.ones(rbins.shape)
-#else:
-#    cchi = FFT.fftn(chi,cchi)
-#    tmp = cchi*(cchi.conj())
-#    corr[:,:,:] = corr[:,:,:]/(Nx*Ny*Nz)
-#            
-#    corrLoc,redges = np.histogram(r2rt,bins = rbins,weights=corr)
-#    r2Loc,r2edges = np.histogram(r2rt,bins = rbins)
-#            
-#    corrSum = np.zeros(corrLoc.shape,dtype=corrLoc.dtype)
-#    comm.Allreduce([corrLoc,MPI.DOUBLE],[corrSum,MPI.DOUBLE],op=MPI.SUM)
-#    r2Sum = np.zeros(r2Loc.shape,dtype=r2Loc.dtype)
-#    comm.Allreduce([r2Loc,MPI.DOUBLE],[r2Sum,MPI.DOUBLE],op=MPI.SUM)
-#
-#if rank==0:
-#    volFr.append(vf)
-#    llogr.append(r2Loc)
-#    lcorr.append(corrLoc)
-#            
-#comm.Barrier(); t2=MPI.Wtime()
-#
-#if rank==0:
-#    print("Single iteration timing: ",t2-t1)
-#
-####################################################
+minJ = -10; maxJ =  10; E_bins = 100
+tl = np.linspace(minJ,maxJ,num=E_bins,endpoint=True) 
 
-E_bins = 115
-dt = 0.118441158993
-tl = np.logspace(np.log(minJ),np.log(maxJ),num=E_bins,endpoint=True,base=np.e) 
+if rank == 0:
+    print("Q and R min/max : ",minQ,maxQ,minR,maxR)
+
+##################################
 
 if rank==0:
-    print(np.log(tl/avg)/np.log(10))
+    print("Computation Boundaries : ",minJ,maxJ)
+    print(tl)
 
 lcorr = []; llogr = []; volFr = []
+
+threshold = ((10.0)**3)/((1024.0)**3)
 
 comm.Barrier(); t1=MPI.Wtime()
 
@@ -308,9 +256,9 @@ for i in range(E_bins-1):
     
     for j in range(E_bins-1):
         comm.Barrier(); jstart=MPI.Wtime()
-        
-        tOm = tl[i]; tOM = tl[i+1]; tEm = tl[j]; tEM = tl[j+1]
-        Index = (w2>tOm)&(w2<tOM)&(S2>tEm)&(S2<tEM)
+                
+        tQm = tl[i]; tQM = tl[i+1]; tRm = tl[j]; tRM = tl[j+1]
+        Index = (Q>tQm)&(Q<tQM)&(R>tRm)&(R<tRM)
         
         chi[:,:,:] = 0
         chi[Index] = 1
@@ -320,10 +268,7 @@ for i in range(E_bins-1):
         comm.Allreduce([vf,MPI.DOUBLE],[vgl,MPI.DOUBLE],op=MPI.SUM)
         vf = vgl/nproc
                     
-        if vf<=0.:
-            corrSum = np.zeros(rbins.shape)
-            r2Loc = np.ones(rbins.shape)
-        else:
+        if vf>threshold:
             cchi = FFT.fftn(chi,cchi)
             tmp = cchi*(cchi.conj())
             corr = FFT.ifftn(tmp,corr)
@@ -336,6 +281,9 @@ for i in range(E_bins-1):
             comm.Allreduce([corrLoc,MPI.DOUBLE],[corrSum,MPI.DOUBLE],op=MPI.SUM)
             r2Sum = np.zeros(r2Loc.shape,dtype=r2Loc.dtype)
             comm.Allreduce([r2Loc,MPI.DOUBLE],[r2Sum,MPI.DOUBLE],op=MPI.SUM)
+        else:
+            corrSum = np.zeros(rbins.shape)
+            r2Loc = np.ones(rbins.shape)
                         
         if rank==0:
             volFr.append(vf)
@@ -365,13 +313,10 @@ if rank==0:
     fiits = []    
     for i in range(E_bins-1):
         for j in range(E_bins-1):
-            tOm = tl[i]
-            tOM = tl[i+1]
+            tQm = tl[i]; tQM = tl[i+1];            
+            tRm = tl[j]; tRM = tl[j+1];
             
-            tEm = tl[j]
-            tEM = tl[j+1]
-            
-            if(volFr[i*(E_bins-1)+j]>0):
+            if(volFr[i*(E_bins-1)+j]>threshold):
                 tcorr = lcorr[i*(E_bins-1)+j][llogr[i*(E_bins-1)+j]>0]
                 tlogr = llogr[i*(E_bins-1)+j][llogr[i*(E_bins-1)+j]>0]
                 tbins = bins[llogr[i*(E_bins-1)+j]>0]
@@ -383,19 +328,19 @@ if rank==0:
                 if(len(tempCorrF[idx])>0):
                     fit = np.polyfit(np.log(tempRp[idx]),np.log(tempCorrF[idx]/corrF[0]),1)
                 else:
-                    fit = np.array([-3,0])
+                    fit = np.array([-4,0])
             else:
-                fit = np.array([-3,0])
+                fit = np.array([-4,0])
                 
             fiits.append(fit[0])
-            print('t = ({one:.7f},{two:.7f})*sigma_2: Linear fit [alpha A] = {tree:.3f}'.format(one=np.log(np.sqrt(tOm*tOM)/avg)/np.log(10),two=np.log(np.sqrt(tEm*tEM)/avg)/np.log(10),tree=fit[0]+3))
+            print('t = ({one:.7f},{two:.7f})*sigma_2: Linear fit [alpha A] = {tree:.3f}'.format(one=(tQm+tQM)/2,two=(tRm+tRM)/2,tree=fit[0]+3))
             
     fiits = np.array(fiits)
 
 if rank==0:
     svolFr = np.array(volFr); sllogr = np.array(llogr);slcorr = np.array(lcorr)
-    np.savez("corr",tl=tl,volFr=svolFr,llogr=sllogr,lcorr=slcorr)
+    np.savez("corr-QR.npz",tl=tl,volFr=svolFr,llogr=sllogr,lcorr=slcorr)
     
 if rank==0:
     print(fiits.shape)
-    np.savez("joint-corr-full-dims.npz",fiits=fiits,E_bins=E_bins,tl=tl,dt=dt)
+    np.savez("QR-corr-full-dims.npz",fiits=fiits,E_bins=E_bins,tl=tl)
