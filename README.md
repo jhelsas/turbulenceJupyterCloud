@@ -1,4 +1,4 @@
-# Turbulence Jupyter Cloud analysis environment
+# Turbulence Jupyter Cloud (TJC) analysis environment
 ===========================================
 
 ## Author: José Hugo Elsas, Mohamed Danish 
@@ -13,7 +13,7 @@ Related publications:
 # Content 
 
 
-### turbulence Jupyter Cloud needs the following libraries and programs installed in your system
+### Turbulence Jupyter Cloud needs the following libraries and programs installed in your system
 
    - Numpy, Scipy, Matplotlib - for basic numerical and plotting functionality
    - pyFFTW for fast FFTs
